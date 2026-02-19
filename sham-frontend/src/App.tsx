@@ -1,36 +1,58 @@
-import { useEffect } from 'react';
-import { init, viewport, mainButton, retrieveLaunchParams } from '@telegram-apps/sdk';  // ← добавили retrieveLaunchParams
+import { useEffect, useState } from 'react';
+import { init, viewport, mainButton, retrieveLaunchParams } from '@telegram-apps/sdk';
 
 function App() {
+  const [isInTelegram, setIsInTelegram] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (init()) {  // Проверка, что внутри Mini App
-      viewport.expand();  // Полный экран
+    const checkTelegramEnv = () => {
+      // Проверка на наличие Telegram.WebApp (теперь TS знает тип)
+      if (window.Telegram?.WebApp) {
+        try {
+          if (init()) {
+            viewport.expand();
 
-      // Получаем данные пользователя безопасно
-      const launchParams = retrieveLaunchParams();
-      const user = launchParams.initData?.user;  // или launchParams.tgWebAppData?.user
-      const userId = user?.id || 'не видно';
+            const params = retrieveLaunchParams();
+            const user = params.initData?.user;
+            const id = user?.id?.toString() || 'не видно';
 
-      alert(`Mini App запущен!\nТвой Telegram ID: ${userId}`);
+            // setState асинхронно, чтобы избежать ESLint warning
+            setTimeout(() => {
+              setUserId(id);
+              setIsInTelegram(true);
+            }, 0);
 
-      // Монтируем mainButton (обязательно в v2!)
-      mainButton.mount();  // ← важно, иначе ничего не работает
+            mainButton.mount();
+            mainButton.setParams({
+              text: 'Открыть Wallet (скоро)',
+              isVisible: true,
+              isEnabled: true,
+            });
 
-      // Настраиваем кнопку
-      mainButton.setParams({
-        text: 'Открыть Wallet (скоро)',
-        isVisible: true,
-        isEnabled: true,          // вместо isActive
-        isLoaderVisible: false,
-        // bgColor: '#FFEB3B',    // можно добавить, если хочешь кастомный цвет
-        // textColor: '#000000',
-      });
+            mainButton.onClick(() => {
+              alert('Main Button нажата!');
+            });
+          }
+        } catch (err) {
+          console.error('Telegram SDK error:', err);
+          // fallback для dev
+          setTimeout(() => {
+            setUserId('DEV_FALLBACK');
+            setIsInTelegram(false);
+          }, 0);
+        }
+      } else {
+        // Браузер / dev
+        setTimeout(() => {
+          setUserId('DEV_MODE_USER_123');
+          setIsInTelegram(false);
+        }, 0);
+        console.log('Запущено вне Telegram');
+      }
+    };
 
-      // Обработчик клика (правильный метод)
-      mainButton.onClick(() => {
-        alert('Main Button нажата! Скоро подключим TON Wallet 😈');
-      });
-    }
+    checkTelegramEnv();
   }, []);
 
   return (
@@ -45,7 +67,18 @@ function App() {
       }}
     >
       <h1>ShamClone — как Blum!</h1>
-      <p>Тапай ниже, чтобы начать фармить поинты (пока тест)</p>
+
+      {isInTelegram ? (
+        <p>Ты в Telegram! ID: {userId || 'Загрузка...'}</p>
+      ) : (
+        <p style={{ color: '#FFEB3B', fontWeight: 'bold' }}>
+          Dev-режим (браузер). Открой через @shamclonebot!
+          <br />
+          Тестовый ID: {userId || 'Загрузка...'}
+        </p>
+      )}
+
+      <p>Тапай ниже (пока тест)</p>
       <button
         style={{
           fontSize: '40px',
@@ -54,7 +87,9 @@ function App() {
           border: 'none',
           borderRadius: '50%',
           cursor: 'pointer',
+          marginTop: '20px',
         }}
+        onClick={() => alert('TAP! Скоро добавим поинты и энергию')}
       >
         TAP!
       </button>
